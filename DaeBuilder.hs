@@ -91,8 +91,8 @@ daeSummary prefix dae = do
 summary :: DaeBuilder a -> IO ()
 summary daeBuilder = do
   let (result, messages, dae) = buildDae daeBuilder
-      (n0,n1,n2) = countLogs messages
-  putStrLn $ "log: (" ++ show n0 ++ " messages, "++show n1++" warnings, "++show n2++" errors)"
+      (n0,n1,n2,n3) = countLogs messages
+  putStrLn $ "log: (" ++ show n0 ++ " messages, "++show n1++" warnings, "++show n2++" errors, "++show n3++" \"impossible\" errors)"
   mapM_ (putStrLn . ("  " ++) . show) messages
   putStr "\nresult: "
   case result of Left (ErrorMessage x) -> putStrLn $ "Failure: " ++ x

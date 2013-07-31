@@ -25,15 +25,15 @@ instance Show LogMessage where
   show (Error x) = "Error: " ++ x
   show (Impossible x) = "\"Impossible\" Error: " ++ x
 
-countLogs' :: (Int,Int,Int) -> [LogMessage] -> (Int,Int,Int)
+countLogs' :: (Int,Int,Int,Int) -> [LogMessage] -> (Int,Int,Int,Int)
 countLogs' x [] = x
-countLogs' (a,b,c) ((Debug _):xs)   = countLogs' (a+1,   b,   c) xs
-countLogs' (a,b,c) ((Warning _):xs) = countLogs' (  a, b+1,   c) xs
-countLogs' (a,b,c) ((Error _):xs)   = countLogs' (  a,   b, c+1) xs
-countLogs' x ((Impossible _):xs)    = countLogs' x xs
+countLogs' (a,b,c,d) ((Debug _):xs)      = countLogs' (a+1,   b,   c,   d) xs
+countLogs' (a,b,c,d) ((Warning _):xs)    = countLogs' (  a, b+1,   c,   d) xs
+countLogs' (a,b,c,d) ((Error _):xs)      = countLogs' (  a,   b, c+1,   d) xs
+countLogs' (a,b,c,d) ((Impossible _):xs) = countLogs' (  a,   b,   c, d+1) xs
 
-countLogs :: [LogMessage] -> (Int,Int,Int)
-countLogs = countLogs' (0,0,0)
+countLogs :: [LogMessage] -> (Int,Int,Int,Int)
+countLogs = countLogs' (0,0,0,0)
 
 newtype ErrorMessage = ErrorMessage String deriving (Error, Show)
 
