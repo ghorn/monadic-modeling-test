@@ -91,10 +91,11 @@ daeSummary prefix dae = do
 summary :: DaeBuilder a -> IO ()
 summary daeBuilder = do
   let (result, messages, dae) = buildDae daeBuilder
-  putStrLn "log:"
+      (n0,n1,n2) = countLogs messages
+  putStrLn $ "log: (" ++ show n0 ++ " messages, "++show n1++" warnings, "++show n2++" errors)"
   mapM_ (putStrLn . ("  " ++) . show) messages
   putStr "\nresult: "
-  case result of Left (ErrorMessage x) -> putStrLn $ "Failure\n  " ++ x
+  case result of Left (ErrorMessage x) -> putStrLn $ "Failure: " ++ x
                  Right _ -> putStrLn "Success!" >> daeSummary "  " dae
 
 withEllipse :: Int -> String -> String
@@ -155,6 +156,7 @@ someDae = do
   thrust <- control "thrust"
 
   k <- constant "viscous damping"
+  -- parameter "pos" -- causes an error
 
   let acceleration = thrust/mass - vel*k
 

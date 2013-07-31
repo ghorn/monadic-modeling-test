@@ -4,6 +4,7 @@
 
 module LogsAndErrors ( ErrorMessage (..)
                      , LogMessage (..)
+                     , countLogs
                      , debug
                      , warn
                      , err
@@ -24,6 +25,16 @@ instance Show LogMessage where
   show (Error x) = "Error: " ++ x
   show (Impossible x) = "\"Impossible\" Error: " ++ x
 
+countLogs' :: (Int,Int,Int) -> [LogMessage] -> (Int,Int,Int)
+countLogs' x [] = x
+countLogs' (a,b,c) ((Debug _):xs)   = countLogs' (a+1,   b,   c) xs
+countLogs' (a,b,c) ((Warning _):xs) = countLogs' (  a, b+1,   c) xs
+countLogs' (a,b,c) ((Error _):xs)   = countLogs' (  a,   b, c+1) xs
+countLogs' x ((Impossible _):xs)    = countLogs' x xs
+
+countLogs :: [LogMessage] -> (Int,Int,Int)
+countLogs = countLogs' (0,0,0)
+
 newtype ErrorMessage = ErrorMessage String deriving (Error, Show)
 
 logMessage :: MonadWriter [t] m => t -> m ()
@@ -37,7 +48,7 @@ warn = logMessage . Warning
 
 err :: (MonadError ErrorMessage m, MonadWriter [LogMessage] m) =>
        String -> m a
-err x = logMessage (Error x) >> (throwError $ ErrorMessage ("error: " ++ x))
+err x = logMessage (Error x) >> (throwError $ ErrorMessage x)
 
 impossible :: (MonadError ErrorMessage m, MonadWriter [LogMessage] m) =>
               String -> m b
