@@ -22,6 +22,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 import LogsAndErrors
+import Utils ( withEllipse )
 import qualified Dvda
 
 type Expr = Dvda.Expr Double
@@ -78,11 +79,6 @@ summary daeBuilder = do
   putStr "\nresult: "
   case result of Left (ErrorMessage x) -> putStrLn $ "Failure: " ++ x
                  Right _ -> putStrLn "Success!" >> daeSummary "  " dae
-
-withEllipse :: Int -> String -> String
-withEllipse n blah
-  | length blah <= n = blah
-  | otherwise = take n blah ++ "..."
 
 infix 4 ===
 (===) :: Expr -> Expr -> DaeBuilder ()
