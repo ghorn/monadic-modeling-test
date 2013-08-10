@@ -53,4 +53,3 @@ err x = logMessage (Error x) >> (throwError $ ErrorMessage x)
 impossible :: (MonadError ErrorMessage m, MonadWriter [LogMessage] m) =>
               String -> m b
 impossible x = logMessage (Impossible x) >> (throwError $ ErrorMessage ("\"impossible error\": " ++ x))
-

@@ -20,40 +20,21 @@ import Control.Monad.State ( State, MonadState, runState, get, put )
 import Control.Monad.Writer ( WriterT, MonadWriter, runWriterT )
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Ratio ( numerator, denominator )
 
 import LogsAndErrors
+import qualified Dvda
 
---- symbolics for the DaeBuilder ---
-data DaeExpr = DaeExprSym String
-             | DaeExprDdt String
-             | DaeExprInt Integer
-             | DaeExprPlus DaeExpr DaeExpr
-             | DaeExprMinus DaeExpr DaeExpr
-             | DaeExprTimes DaeExpr DaeExpr
-             | DaeExprNegate DaeExpr
-             | DaeExprDiv DaeExpr DaeExpr
-             deriving Show
-instance Num DaeExpr where
-  (+) = DaeExprPlus
-  (-) = DaeExprMinus
-  (*) = DaeExprTimes
-  abs = error "absolute value not supported"
-  signum = error "signum not supported"
-  fromInteger = DaeExprInt
-  negate = DaeExprNegate
-instance Fractional DaeExpr where
-  (/) = DaeExprDiv
-  fromRational x = DaeExprInt (numerator x) / DaeExprInt (denominator x)
+type Expr = Dvda.Expr Double
 
 -- | the monad for building up a Dae
 data DaeBuilderState = DaeBuilderState
-                       { _dbX    :: M.Map String DaeExpr
-                       , _dbU    :: M.Map String DaeExpr
-                       , _dbZ    :: M.Map String DaeExpr
-                       , _dbP    :: M.Map String DaeExpr
-                       , _dbC    :: M.Map String DaeExpr
-                       , _dbImplicitEq :: [(DaeExpr,DaeExpr)]
+                       { _dbX    :: M.Map String Expr
+                       , _dbU    :: M.Map String Expr
+                       , _dbZ    :: M.Map String Expr
+                       , _dbP    :: M.Map String Expr
+                       , _dbC    :: M.Map String Expr
+                       , _dbImplicitEq :: [(Expr,Expr)]
+                       , _dbIntermediateState :: M.Map String Expr
                        } deriving Show
 makeLenses ''DaeBuilderState
 
@@ -104,7 +85,7 @@ withEllipse n blah
   | otherwise = take n blah ++ "..."
 
 infix 4 ===
-(===) :: DaeExpr -> DaeExpr -> DaeBuilder ()
+(===) :: Expr -> Expr -> DaeBuilder ()
 (===) lhs rhs = do
   debug $ "adding implicit equation: " ++
     withEllipse 30 (show lhs) ++ " == " ++ withEllipse 30 (show rhs)
@@ -126,26 +107,25 @@ assertUniqueName name = do
   allNames <- getAllNames
   when (S.member name allNames) (err $ "in DaeBuilder, \"" ++ name ++ "\" is not a unique name")
 
-addDaeSym :: Control.Lens.Setter.Setting (->) DaeBuilderState DaeBuilderState
-             (M.Map String DaeExpr) (M.Map String DaeExpr)
-          -> String -> String -> DaeBuilder DaeExpr
+addDaeSym :: Setting (->) DaeBuilderState DaeBuilderState (M.Map String Expr) (M.Map String Expr)
+          -> String -> String -> DaeBuilder Expr
 addDaeSym overMe descriptor name = do
   debug $ "adding "++descriptor++": "++name
   assertUniqueName name
   state0 <- get
-  let sym = DaeExprSym name
-  put $ over overMe (\m0 -> M.insert name sym m0) state0
+  let sym = Dvda.sym name
+  put $ over overMe (M.insert name sym) state0
   return sym
-  
-diffState, algVar, control, parameter, constant :: String -> DaeBuilder DaeExpr
+
+diffState, algVar, control, parameter, constant :: String -> DaeBuilder Expr
 diffState = addDaeSym dbX "differential state"
 algVar    = addDaeSym dbZ "algebraic variable"
 control   = addDaeSym dbU "control"
 parameter = addDaeSym dbP "parameter"
 constant  = addDaeSym dbC "constant"
 
-ddt :: String -> DaeExpr
-ddt = DaeExprDdt
+ddt :: Expr -> Expr
+ddt = error "ddt unimplemented :("
 
 someDae :: DaeBuilder ()
 someDae = do
