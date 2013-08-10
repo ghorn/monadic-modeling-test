@@ -4,6 +4,7 @@
 
 module DaeBuilder ( DaeBuilder (..)
                   , (===)
+                  , (@=)
                   , buildDae
                     -- * dae symbols
                   , diffState, algVar, control, parameter, constant
@@ -40,7 +41,7 @@ data DaeBuilderState = DaeBuilderState
 makeLenses ''DaeBuilderState
 
 emptyDaeBuilder :: DaeBuilderState
-emptyDaeBuilder = DaeBuilderState M.empty M.empty M.empty M.empty M.empty []
+emptyDaeBuilder = DaeBuilderState M.empty M.empty M.empty M.empty M.empty [] M.empty
 
 newtype DaeBuilder a =
   DaeBuilder
@@ -68,7 +69,10 @@ daeSummary prefix dae = do
   blah "parameters " dbP
   blah "constants  " dbC
   let ieqs = dae ^. dbImplicitEq
-  putStrLn $ prefix ++ show (length ieqs) ++ " implicit equations: " ++ withEllipse 70 (show ieqs)
+      istates = M.keys $ dae ^. dbIntermediateState
+  putStrLn $ prefix ++ show (length ieqs) ++ " implicit equations:"
+  mapM_ (\(lhs,rhs) -> putStrLn (show lhs ++ " == " ++ show rhs)) ieqs
+  putStrLn $ prefix ++ show (length istates) ++ " intermediate states: " ++ withEllipse 70 (show istates)
   
 summary :: DaeBuilder a -> IO ()
 summary daeBuilder = do
@@ -87,6 +91,15 @@ infix 4 ===
     withEllipse 30 (show lhs) ++ " == " ++ withEllipse 30 (show rhs)
   state0 <- get
   put $ over dbImplicitEq ((lhs,rhs):) state0
+
+infix 4 @=
+(@=) :: Expr -> String -> DaeBuilder ()
+(@=) expr name = do
+  debug $ "setting intermediate state: " ++ name ++ " = " ++
+    withEllipse 30 (show expr)
+  assertUniqueName name
+  state0 <- get
+  put $ over dbIntermediateState (M.insert name expr) state0
 
 getAllNames :: DaeBuilder (S.Set String)
 getAllNames = do
@@ -120,7 +133,7 @@ control   = addDaeSym dbU "control"
 parameter = addDaeSym dbP "parameter"
 constant  = addDaeSym dbC "constant"
 
-ddt :: Expr -> Expr
+ddt :: String -> Expr
 ddt = error "ddt unimplemented :("
 
 someDae :: DaeBuilder ()
@@ -134,11 +147,10 @@ someDae = do
   k <- constant "viscous damping"
   -- parameter "pos" -- causes an error
 
-  let acceleration = thrust/mass - vel*k
+  let accel = thrust/mass - vel*k
 
-  ddt "pos" === vel
-  ddt "vel" === acceleration
+  accel @= "acceleration"
+
+  ddt "pos"  === vel
+  ddt "vel"  === accel
   ddt "mass" === -0.8*thrust*thrust
-
-go :: IO ()
-go = summary someDae
