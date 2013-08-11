@@ -1,14 +1,14 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module KinematicMekf ( propogate
+module KinematicMekf ( kinematicMekf
+                     , go
                      ) where
 
 import Linear
 import Estimator
-import Builder ( summary )
 
-propogate :: Estimator ()
-propogate = do
+kinematicMekf :: Estimator ()
+kinematicMekf = do
   q_b2e <- stateV3 "q_b2e"
   r_n2b_n <- stateV3 "r_n2b_n"
   v_bn_n <- stateV3 "v_bn_n"
@@ -42,4 +42,4 @@ propogate = do
   setNextV3 accelBias $ fmap (*exp(-ts/tauAccel)) accelBias
 
 go :: IO ()
-go = summary propogate
+go = estimatorSummary kinematicMekf

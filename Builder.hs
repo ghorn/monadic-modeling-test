@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# Language TemplateHaskell #-}
 {-# Language GeneralizedNewtypeDeriving #-}
 
 module Builder ( Builder
@@ -8,10 +7,14 @@ module Builder ( Builder
                , (@=)
                , addSym
                , build
-               , summary
+                 -- * summaries
+               , showLog
+               , showSymbols
+               , showIntermediateStates
+               , showImplicitEquations
                ) where
 
-import Control.Lens ( (^.), makeLenses, over )
+import Control.Lens ( (^.), over )
 import Control.Monad ( when )
 import Control.Monad.Error ( ErrorT, MonadError, runErrorT )
 import Control.Monad.State ( State, MonadState, runState, get, put )
@@ -19,81 +22,70 @@ import Control.Monad.Writer ( WriterT, MonadWriter, runWriterT )
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import qualified Dvda
-
+import Classes
+import Expr
 import LogsAndErrors
 import Utils ( withEllipse )
 
-type Expr = Dvda.Expr Double
-
-data BuilderState syms = BuilderState { _bSyms :: M.Map syms (M.Map String Expr)
-                                      , _bIntermediateStates :: M.Map String Expr
-                                      , _bImplicitEqs :: [(Expr,Expr)]
-                                      }
-makeLenses ''BuilderState
-
-newtype Builder syms a =
+newtype Builder s a =
   Builder
-  { runBuilder :: ErrorT ErrorMessage (WriterT [LogMessage] (State (BuilderState syms))) a
+  { runBuilder :: ErrorT ErrorMessage (WriterT [LogMessage] (State s)) a
   } deriving ( Monad
              , MonadError ErrorMessage
-             , MonadState (BuilderState syms)
+             , MonadState s
              , MonadWriter [LogMessage]
              )
 
-build :: (Enum s, Ord s) => Builder s a -> (Either ErrorMessage a, [LogMessage], BuilderState s)
-build builder = (result, logs, state)
+build :: s -> Builder s a -> (Either ErrorMessage a, [LogMessage], s)
+build emptyBuilder builder = (result, logs, state)
   where
-    emptySyms = M.fromList $ map (\x -> (x,M.empty)) $ enumFrom (toEnum 0)
-    emptyBuilder = BuilderState emptySyms M.empty []
     ((result,logs),state) =
       flip runState emptyBuilder . runWriterT . runErrorT . runBuilder $ builder
 
-getAllSyms :: Builder s (M.Map s (M.Map String Expr))
-getAllSyms = do
-  b <- get
-  return (b ^. bSyms)
+assertUniqueIntermediateStateName :: IntermediateStates s => String -> Builder s ()
+assertUniqueIntermediateStateName name = do
+  s <- get
+  when (M.member name (s ^. (intermediateStates s))) $
+    err $ name ++ " is not a unique intermediate state name"
 
-getAllNames :: Builder s (S.Set String)
-getAllNames = do
-  allSyms <- getAllSyms
-  b <- get
-  let symNames = ((S.unions . (map M.keysSet) . M.elems)) allSyms
-      isNames = M.keysSet (b ^. bIntermediateStates)
-  return $ S.union symNames isNames
-
-assertUniqueName :: String -> Builder s ()
+assertUniqueName :: (IntermediateStates s, Symbols s a) => String -> Builder s ()
 assertUniqueName name = do
-  allNames <- getAllNames
-  when (S.member name allNames) (err $ "in Builder, \"" ++ name ++ "\" is not a unique name")
+  assertUniqueSymbolName name
+  assertUniqueIntermediateStateName name
+
+assertUniqueSymbolName :: Symbols s a => String -> Builder s ()
+assertUniqueSymbolName name = do
+  allSymbolNames <- getAllSymbolNames
+  when (S.member name allSymbolNames) $
+    err $ "in Builder, \"" ++ name ++ "\" is not a unique symbol name"
 
 infix 4 @=
-(@=) :: Expr -> String -> Builder s ()
+(@=) :: (Symbols s a, IntermediateStates s) => Expr -> String -> Builder s ()
 (@=) expr name = do
   debug $ "setting intermediate state: " ++ name ++ " = " ++
     withEllipse 30 (show expr)
   assertUniqueName name
   b <- get
-  put $ over bIntermediateStates (M.insert name expr) b
+  put $ over (intermediateStates b) (M.insert name expr) b
 
 infix 4 ===
-(===) :: Expr -> Expr -> Builder s ()
+(===) :: ImplicitEquations s => Expr -> Expr -> Builder s ()
 (===) lhs rhs = do
   debug $ "adding implicit equation: " ++
     withEllipse 30 (show lhs) ++ " == " ++ withEllipse 30 (show rhs)
   state0 <- get
-  put $ over bImplicitEqs ((lhs,rhs):) state0
+  put $ over (implicitEquations state0) ((lhs,rhs):) state0
 
-addSym :: (Ord s, Show s) => s -> String -> Builder s Expr
+addSym :: (Show a, Symbols s a) => a -> String -> Builder s Expr
 addSym overMe name = do
   let descriptor = show overMe
   debug $ "adding "++descriptor++": "++name
-  assertUniqueName name
+  assertUniqueSymbolName name
   b <- get
-  let sym = Dvda.sym name
-      map0 = b ^. bSyms
+  let sym = newSym name
+      map0 = b ^. (symbols b)
   when (M.notMember overMe map0) $ impossible $ descriptor ++ " not in symbol map"
-  put $ over bSyms (M.adjust (M.insert name sym) overMe) b
+  put $ over (symbols b) (M.adjust (M.insert name sym) overMe) b
   return sym
 
 showSymbols :: Show s => M.Map s (M.Map String Expr) -> IO ()
@@ -106,24 +98,13 @@ showIntermediateStates is = do
   putStrLn $ "intermediate states: (" ++ show (M.size is) ++ ")"
   mapM_ (\(key,val) -> putStrLn $ "  " ++ key ++ ": " ++ withEllipse 40 (show val)) $ M.toList is
 
-showImplicitEqs :: [(Expr,Expr)] -> IO ()
-showImplicitEqs ieqs = do
+showImplicitEquations :: [(Expr,Expr)] -> IO ()
+showImplicitEquations ieqs = do
   putStrLn $ "implicit equations: (" ++ show (length ieqs) ++ ")"
-  mapM_ (\(lhs,rhs) -> putStrLn (withEllipse 30 (show lhs) ++ " == " ++ withEllipse 30 (show rhs))) ieqs
+  mapM_ (\(lhs,rhs) -> putStrLn ("  " ++ withEllipse 30 (show lhs) ++ " == " ++ withEllipse 30 (show rhs))) ieqs
 
-summary :: (Enum syms, Ord syms, Show syms) => Builder syms a -> IO ()
-summary builder = do
-  let (result, messages, b) = build builder
-      (n0,n1,n2,n3) = countLogs messages
+showLog :: [LogMessage] -> IO ()
+showLog messages = do
+  let (n0,n1,n2,n3) = countLogs messages
   putStrLn $ "log: (" ++ show n0 ++ " messages, "++show n1++" warnings, "++show n2++" errors, "++show n3++" \"impossible\" errors)"
   mapM_ (putStrLn . ("  " ++) . show) messages
-  putStr "\nresult: "
-  case result of Left (ErrorMessage x) -> putStrLn $ "Failure: " ++ x
-                 Right _ -> do
-                   putStrLn "Success!"
-                   putStrLn ""
-                   showSymbols (b ^. bSyms)
-                   putStrLn ""
-                   showIntermediateStates (b ^. bIntermediateStates)
-                   putStrLn ""
-                   showImplicitEqs (b ^. bImplicitEqs)

@@ -1,7 +1,9 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# Language TemplateHaskell #-}
+{-# Language MultiParamTypeClasses #-}
 
 module Estimator ( Estimator
+                   -- * estimator symbols
                  , state
                  , stateV3
                  , process
@@ -9,17 +11,37 @@ module Estimator ( Estimator
                  , processNoise
                  , processNoiseV3
                  , constant
+                 , (@=)
+                   -- * propogate
                  , setNext
                  , setNextV3
+                   -- * building
+                 , buildEstimator
+                 , estimatorSummary
                  ) where
 
-import Linear
-import Builder
-import LogsAndErrors ( err )
+import Control.Lens ( (^.), makeLenses )
+import qualified Data.Map as M
 
+import Classes
+import Linear ( V3(..) )
+import Builder
+import LogsAndErrors
+
+data EstimatorState = EstimatorState { _eSymbols :: M.Map EstimatorSymbols (M.Map String Expr)
+                                     , _eIntermediateState :: M.Map String Expr
+                                     }
 data EstimatorSymbols = State | Process | ProcessNoise | Constant deriving (Eq,Enum,Ord,Show)
 
-type Estimator a = Builder EstimatorSymbols a
+makeLenses ''EstimatorState
+
+instance Symbols EstimatorState EstimatorSymbols where
+  symbols _ = eSymbols
+
+instance IntermediateStates EstimatorState where
+  intermediateStates _ = eIntermediateState
+
+type Estimator a = Builder EstimatorState a
 
 setNext :: Expr -> Expr -> Estimator ()
 setNext _ _ = err "setNext is not implemented"
@@ -53,3 +75,26 @@ stateV3,processV3,processNoiseV3 :: String -> Estimator (V3 Expr)
 stateV3 = vecSym state
 processV3 = vecSym process
 processNoiseV3 = vecSym processNoise
+
+emptyEstimator :: EstimatorState
+emptyEstimator = EstimatorState { _eSymbols = emptySymbols (emptyEstimator :: EstimatorState)
+                                , _eIntermediateState = M.empty
+                                }
+
+buildEstimator :: Estimator a -> (Either ErrorMessage a, [LogMessage], EstimatorState)
+buildEstimator = build emptyEstimator
+
+estimatorSummary :: Estimator a -> IO ()
+estimatorSummary est = do
+  let (result, messages, x) = buildEstimator est
+  showLog messages
+  putStr "\nresult: "
+  case result of
+    Left (ErrorMessage msg) -> putStrLn $ "Failure: " ++ msg
+    Right _ -> do
+      putStrLn "Success!"
+      putStrLn ""
+      showSymbols (x ^. (symbols x))
+      putStrLn ""
+      showIntermediateStates (x ^. (intermediateStates x))
+

@@ -21,10 +21,13 @@ cabal-version:       >=1.8
 
 library
   exposed-modules:     Builder
+                       Classes
                        Dae
                        Estimator
+                       Expr
                        KinematicMekf
                        LogsAndErrors
+                       RocketDae
                        Utils
 
   other-modules:       
