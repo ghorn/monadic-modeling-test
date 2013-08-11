@@ -66,8 +66,8 @@ daeSummary dae = do
     Right _ -> do
       putStrLn "Success!"
       putStrLn ""
-      showSymbols (x ^. (symbols x))
+      showSymbols (x ^. symbols x)
       putStrLn ""
-      showIntermediateStates (x ^. (intermediateStates x))
+      showIntermediateStates (x ^. intermediateStates x)
       putStrLn ""
-      showImplicitEquations (x ^. (implicitEquations x))
+      showImplicitEquations (x ^. implicitEquations x)

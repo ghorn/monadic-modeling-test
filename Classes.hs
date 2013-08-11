@@ -36,13 +36,13 @@ class ImplicitEquations a where
 getAllSyms :: (MonadState s (m s), Symbols s a) => m s (M.Map a (M.Map String Expr))
 getAllSyms = do
   b <- get
-  return (b ^. (symbols b))
+  return (b ^. symbols b)
 
 getAllSymbolNames :: (MonadState s (m s), Symbols s a) =>
                      m s (S.Set String)
 getAllSymbolNames = do
   allSyms <- getAllSyms
-  return $ ((S.unions . (map M.keysSet) . M.elems)) allSyms
+  return $ (S.unions . map M.keysSet . M.elems) allSyms
 
 emptySymbols :: Symbols s a => s -> M.Map a (M.Map String Expr)
 emptySymbols _ = M.fromList $ map (\x -> (x,M.empty)) $ enumFrom (toEnum 0)
@@ -52,7 +52,7 @@ symbolElement :: (Show a, MonadError ErrorMessage m, MonadWriter [LogMessage] m,
                  a -> Expr -> m Bool
 symbolElement overMe sym = do
   x <- get
-  let syms = x ^. (symbols x)
+  let syms = x ^. symbols x
   case M.lookup overMe syms of
     Nothing -> impossible $ "lookupSymbol: " ++ show overMe ++ " not in symbol map"
-    Just m -> if sym `elem` (M.elems m) then return True else return False
+    Just m -> return $ sym `elem` M.elems m

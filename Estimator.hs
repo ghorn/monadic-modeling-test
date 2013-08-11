@@ -21,8 +21,9 @@ module Estimator ( Estimator
                  ) where
 
 import Control.Lens ( (^.), makeLenses, over )
-import Control.Monad ( when )
+import Control.Monad ( unless, when )
 import Control.Monad.State ( get, put )
+import Data.Function ( on )
 import Data.List ( sortBy )
 import qualified Data.Map as M
 import qualified Data.HashMap.Lazy as HM
@@ -53,12 +54,12 @@ type Estimator a = Builder EstimatorState a
 setNext :: Expr -> Expr -> Estimator ()
 setNext sym@(Dvda.Expr.ESym _) val = do
   iselem <- symbolElement State sym
-  when (not iselem) $ err $ "setNext: "++show sym++" is not a " ++ show State
+  unless iselem $ err $ "setNext: "++show sym++" is not a " ++ show State
   x <- get
   when (HM.member sym (x ^. eNext)) $
     err $ "setNext: you tried to set " ++ show sym ++ " twice"
   put $ over eNext (HM.insert sym val) x
-setNext other _ = do
+setNext other _ =
   err $ "setNext tried to set something which is not a symbol: " ++ show other
 
 setNextV3 :: V3 Expr -> V3 Expr -> Estimator ()
@@ -102,7 +103,7 @@ buildEstimator = build emptyEstimator
 
 showNext :: HM.HashMap Expr Expr -> IO ()
 showNext hm = do
-  let blahs = sortBy (\x y -> compare (show x) (show y)) $ HM.toList hm
+  let blahs = sortBy (compare `on` show) $ HM.toList hm
   putStrLn "next value: "
   mapM_ (\(key, val) -> putStrLn $ show key ++ ": " ++ withEllipse 40 (show val)) blahs
 
@@ -116,8 +117,8 @@ estimatorSummary est = do
     Right _ -> do
       putStrLn "Success!"
       putStrLn ""
-      showSymbols (x ^. (symbols x))
+      showSymbols (x ^. symbols x)
       putStrLn ""
-      showIntermediateStates (x ^. (intermediateStates x))
+      showIntermediateStates (x ^. intermediateStates x)
       putStrLn ""
       showNext (x ^. eNext)

@@ -45,7 +45,7 @@ build emptyBuilder builder = (result, logs, state)
 assertUniqueIntermediateStateName :: IntermediateStates s => String -> Builder s ()
 assertUniqueIntermediateStateName name = do
   s <- get
-  when (M.member name (s ^. (intermediateStates s))) $
+  when (M.member name (s ^. intermediateStates s)) $
     err $ name ++ " is not a unique intermediate state name"
 
 assertUniqueName :: (IntermediateStates s, Symbols s a) => String -> Builder s ()
@@ -83,7 +83,7 @@ addSym overMe name = do
   assertUniqueSymbolName name
   b <- get
   let sym = newSym name
-      map0 = b ^. (symbols b)
+      map0 = b ^. symbols b
   when (M.notMember overMe map0) $ impossible $ descriptor ++ " not in symbol map"
   put $ over (symbols b) (M.adjust (M.insert name sym) overMe) b
   return sym

@@ -27,10 +27,10 @@ instance Show LogMessage where
 
 countLogs' :: (Int,Int,Int,Int) -> [LogMessage] -> (Int,Int,Int,Int)
 countLogs' x [] = x
-countLogs' (a,b,c,d) ((Debug _):xs)      = countLogs' (a+1,   b,   c,   d) xs
-countLogs' (a,b,c,d) ((Warning _):xs)    = countLogs' (  a, b+1,   c,   d) xs
-countLogs' (a,b,c,d) ((Error _):xs)      = countLogs' (  a,   b, c+1,   d) xs
-countLogs' (a,b,c,d) ((Impossible _):xs) = countLogs' (  a,   b,   c, d+1) xs
+countLogs' (a,b,c,d) (Debug _:xs)      = countLogs' (a+1,   b,   c,   d) xs
+countLogs' (a,b,c,d) (Warning _:xs)    = countLogs' (  a, b+1,   c,   d) xs
+countLogs' (a,b,c,d) (Error _:xs)      = countLogs' (  a,   b, c+1,   d) xs
+countLogs' (a,b,c,d) (Impossible _:xs) = countLogs' (  a,   b,   c, d+1) xs
 
 countLogs :: [LogMessage] -> (Int,Int,Int,Int)
 countLogs = countLogs' (0,0,0,0)
@@ -48,8 +48,8 @@ warn = logMessage . Warning
 
 err :: (MonadError ErrorMessage m, MonadWriter [LogMessage] m) =>
        String -> m a
-err x = logMessage (Error x) >> (throwError $ ErrorMessage x)
+err x = logMessage (Error x) >> throwError (ErrorMessage x)
 
 impossible :: (MonadError ErrorMessage m, MonadWriter [LogMessage] m) =>
               String -> m b
-impossible x = logMessage (Impossible x) >> (throwError $ ErrorMessage ("\"impossible error\": " ++ x))
+impossible x = logMessage (Impossible x) >> throwError (ErrorMessage ("\"impossible error\": " ++ x))
