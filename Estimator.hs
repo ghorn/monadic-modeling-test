@@ -20,16 +20,23 @@ module Estimator ( Estimator
                  , estimatorSummary
                  ) where
 
-import Control.Lens ( (^.), makeLenses )
+import Control.Lens ( (^.), makeLenses, over )
+import Control.Monad ( when )
+import Control.Monad.State ( get, put )
+import Data.List ( sortBy )
 import qualified Data.Map as M
+import qualified Data.HashMap.Lazy as HM
 
+import qualified Dvda.Expr ( Expr (ESym) )
 import Classes
 import Linear ( V3(..) )
 import Builder
 import LogsAndErrors
+import Utils ( withEllipse )
 
 data EstimatorState = EstimatorState { _eSymbols :: M.Map EstimatorSymbols (M.Map String Expr)
                                      , _eIntermediateState :: M.Map String Expr
+                                     , _eNext :: HM.HashMap Expr Expr
                                      }
 data EstimatorSymbols = State | Process | ProcessNoise | Constant deriving (Eq,Enum,Ord,Show)
 
@@ -44,7 +51,15 @@ instance IntermediateStates EstimatorState where
 type Estimator a = Builder EstimatorState a
 
 setNext :: Expr -> Expr -> Estimator ()
-setNext _ _ = err "setNext is not implemented"
+setNext sym@(Dvda.Expr.ESym _) val = do
+  iselem <- symbolElement State sym
+  when (not iselem) $ err $ "setNext: "++show sym++" is not a " ++ show State
+  x <- get
+  when (HM.member sym (x ^. eNext)) $
+    err $ "setNext: you tried to set " ++ show sym ++ " twice"
+  put $ over eNext (HM.insert sym val) x
+setNext other _ = do
+  err $ "setNext tried to set something which is not a symbol: " ++ show other
 
 setNextV3 :: V3 Expr -> V3 Expr -> Estimator ()
 setNextV3 (V3 x0 y0 z0) (V3 x1 y1 z1) = do
@@ -79,10 +94,17 @@ processNoiseV3 = vecSym processNoise
 emptyEstimator :: EstimatorState
 emptyEstimator = EstimatorState { _eSymbols = emptySymbols (emptyEstimator :: EstimatorState)
                                 , _eIntermediateState = M.empty
+                                , _eNext = HM.empty
                                 }
 
 buildEstimator :: Estimator a -> (Either ErrorMessage a, [LogMessage], EstimatorState)
 buildEstimator = build emptyEstimator
+
+showNext :: HM.HashMap Expr Expr -> IO ()
+showNext hm = do
+  let blahs = sortBy (\x y -> compare (show x) (show y)) $ HM.toList hm
+  putStrLn "next value: "
+  mapM_ (\(key, val) -> putStrLn $ show key ++ ": " ++ withEllipse 40 (show val)) blahs
 
 estimatorSummary :: Estimator a -> IO ()
 estimatorSummary est = do
@@ -97,4 +119,5 @@ estimatorSummary est = do
       showSymbols (x ^. (symbols x))
       putStrLn ""
       showIntermediateStates (x ^. (intermediateStates x))
-
+      putStrLn ""
+      showNext (x ^. eNext)
