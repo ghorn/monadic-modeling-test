@@ -34,6 +34,7 @@ library
 
   build-depends:       base >= 4.5 && < 5,
                        containers >= 0.5.0.0,
+                       unordered-containers >= 0.2.3,
                        mtl >= 2.1.2,
                        lens >= 3.9.0,
                        hashable >= 1.2.0,
