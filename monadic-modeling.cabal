@@ -20,7 +20,10 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 library
-  exposed-modules:     Modeling
+  exposed-modules:     Builder
+                       Dae
+                       Estimator
+                       KinematicMekf
                        LogsAndErrors
                        Utils
 
@@ -31,6 +34,7 @@ library
                        mtl >= 2.1.2,
                        lens >= 3.9.0,
                        hashable >= 1.2.0,
+                       linear >= 1.1.4,
                        dvda >= 0.4
 
 --  ghc-options: -O2
